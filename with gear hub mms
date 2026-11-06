@@ -1,0 +1,413 @@
+-- LocalScript: Master MM2 FFA Utility Hub
+-- cracked by ouxhiee
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+
+local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 5)
+
+local HitboxConfig = { Enabled = false, Size = 15, Transparency = 0.99, TeamCheck = false, ChamsEnabled = false, ChamsColor = Color3.fromRGB(255, 0, 0) }
+local FogPresets = {
+    { name = "Halloween Black", color = Color3.fromRGB(0, 0, 0) },
+    { name = "Pure White", color = Color3.fromRGB(255, 255, 255) },
+    { name = "Hot Pink", color = Color3.fromRGB(255, 105, 180) },
+    { name = "Pastel Purple", color = Color3.fromRGB(186, 85, 211) },
+    { name = "Vapor Blue", color = Color3.fromRGB(0, 191, 255) },
+    { name = "Neon Red", color = Color3.fromRGB(255, 30, 30) },
+    { name = "Cyan Glow", color = Color3.fromRGB(0, 255, 230) },
+    { name = "Lime Green", color = Color3.fromRGB(50, 255, 100) },
+    { name = "Sunburst Gold", color = Color3.fromRGB(255, 180, 40) },
+}
+local FogConfig = { Enabled = false, Color = Color3.fromRGB(0, 0, 0), StartDistance = 0, EndDistance = 60 }
+local originalSizes = {}
+
+local function notifyOwnerCredit(parentGui)
+    pcall(function()
+        if parentGui:FindFirstChild("CustomBottomLeftNotif") then parentGui.CustomBottomLeftNotif:Destroy() end
+        local notifGui = Instance.new("ScreenGui")
+        notifGui.Name = "CustomBottomLeftNotif"; notifGui.ResetOnSpawn = false
+        notifGui.DisplayOrder = 1000; notifGui.Parent = parentGui
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(0, 260, 0, 60); card.Position = UDim2.new(0, 20, 1, 80)
+        card.BackgroundColor3 = Color3.fromRGB(30, 35, 45); card.BorderSizePixel = 0; card.Parent = notifGui
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+        local cs = Instance.new("UIStroke", card); cs.Color = Color3.fromRGB(100, 200, 255); cs.Thickness = 1.5
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Size = UDim2.new(1, -40, 0, 20); titleLbl.Position = UDim2.new(0, 12, 0, 8)
+        titleLbl.BackgroundTransparency = 1; titleLbl.Text = "Script Panel Active"
+        titleLbl.TextColor3 = Color3.fromRGB(100, 200, 255); titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.TextSize = 11; titleLbl.TextXAlignment = Enum.TextXAlignment.Left; titleLbl.Parent = card
+        local msgLbl = Instance.new("TextLabel")
+        msgLbl.Size = UDim2.new(1, -40, 0, 22); msgLbl.Position = UDim2.new(0, 12, 0, 26)
+        msgLbl.BackgroundTransparency = 1; msgLbl.Text = "most scripts cracked by ouxhiee"
+        msgLbl.TextColor3 = Color3.fromRGB(230, 240, 255); msgLbl.Font = Enum.Font.GothamMedium
+        msgLbl.TextSize = 11; msgLbl.TextXAlignment = Enum.TextXAlignment.Left; msgLbl.Parent = card
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 24, 0, 24); closeBtn.Position = UDim2.new(1, -28, 0, 8)
+        closeBtn.BackgroundTransparency = 1; closeBtn.Text = "✕"
+        closeBtn.TextColor3 = Color3.fromRGB(150, 170, 200); closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 14; closeBtn.Parent = card
+        local function dismiss()
+            local out = TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 20, 1, 80)})
+            out:Play(); out.Completed:Connect(function() notifGui:Destroy() end)
+        end
+        closeBtn.MouseButton1Click:Connect(dismiss)
+        TweenService:Create(card, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 20, 1, -80)}):Play()
+        task.delay(10, function() if notifGui and notifGui.Parent then dismiss() end end)
+    end)
+end
+
+local function applyFog()
+    local atmos = Lighting:FindFirstChildOfClass("Atmosphere")
+    if atmos then atmos.Density = 0 end
+    if FogConfig.Enabled then
+        Lighting.FogColor = FogConfig.Color
+        Lighting.FogStart = FogConfig.StartDistance
+        Lighting.FogEnd = FogConfig.EndDistance
+    else
+        Lighting.FogStart = 0; Lighting.FogEnd = 100000
+    end
+end
+
+local function parseHex(hex)
+    hex = hex:gsub("#", "")
+    if #hex == 6 then
+        local r = tonumber(hex:sub(1, 2), 16)
+        local g = tonumber(hex:sub(3, 4), 16)
+        local b = tonumber(hex:sub(5, 6), 16)
+        if r and g and b then return Color3.fromRGB(r, g, b) end
+    end
+    return nil
+end
+
+local function updateChams(character, enable)
+    if not character then return end
+    local h = character:FindFirstChild("CCHubHighlight")
+    if enable and HitboxConfig.ChamsEnabled then
+        if not h then
+            h = Instance.new("Highlight"); h.Name = "CCHubHighlight"; h.Adornee = character
+            h.FillColor = HitboxConfig.ChamsColor; h.OutlineColor = HitboxConfig.ChamsColor
+            h.FillTransparency = 0.5; h.OutlineTransparency = 0; h.Parent = character
+        end
+        h.Enabled = true
+    else
+        if h then h.Enabled = false end
+    end
+end
+
+if playerGui:FindFirstChild("MasterUtilityHub") then playerGui.MasterUtilityHub:Destroy() end
+if playerGui:FindFirstChild("StartupPromptGui") then playerGui.StartupPromptGui:Destroy() end
+
+local promptGui = Instance.new("ScreenGui")
+promptGui.Name = "StartupPromptGui"; promptGui.ResetOnSpawn = false
+promptGui.DisplayOrder = 1001; promptGui.Parent = playerGui
+
+local modalFrame = Instance.new("Frame")
+modalFrame.Size = UDim2.new(0, 300, 0, 140); modalFrame.Position = UDim2.new(0.5, -150, 0.5, -70)
+modalFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38); modalFrame.BorderSizePixel = 0; modalFrame.Parent = promptGui
+Instance.new("UICorner", modalFrame).CornerRadius = UDim.new(0, 12)
+local ms = Instance.new("UIStroke", modalFrame); ms.Color = Color3.fromRGB(255, 200, 80); ms.Thickness = 1.5; ms.Transparency = 0.4
+
+local promptTitle = Instance.new("TextLabel")
+promptTitle.Size = UDim2.new(1, 0, 0, 35); promptTitle.Position = UDim2.new(0, 0, 0, 12)
+promptTitle.BackgroundTransparency = 1; promptTitle.Text = "Load hitbox script?"
+promptTitle.TextColor3 = Color3.fromRGB(255, 220, 120); promptTitle.Font = Enum.Font.GothamBold; promptTitle.TextSize = 15; promptTitle.Parent = modalFrame
+
+local promptSub = Instance.new("TextLabel")
+promptSub.Size = UDim2.new(1, 0, 0, 25); promptSub.Position = UDim2.new(0, 0, 0, 42)
+promptSub.BackgroundTransparency = 1; promptSub.Text = "mm2 ffa ONLY."
+promptSub.TextColor3 = Color3.fromRGB(200, 100, 100); promptSub.Font = Enum.Font.GothamBold; promptSub.TextSize = 13; promptSub.Parent = modalFrame
+
+local yesBtn = Instance.new("TextButton")
+yesBtn.Size = UDim2.new(0.42, 0, 0, 34); yesBtn.Position = UDim2.new(0.06, 0, 0, 82)
+yesBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113); yesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+yesBtn.Text = "Yes"; yesBtn.Font = Enum.Font.GothamBold; yesBtn.TextSize = 13; yesBtn.Parent = modalFrame
+Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 8)
+
+local noBtn = Instance.new("TextButton")
+noBtn.Size = UDim2.new(0.42, 0, 0, 34); noBtn.Position = UDim2.new(0.52, 0, 0, 82)
+noBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50); noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+noBtn.Text = "No"; noBtn.Font = Enum.Font.GothamBold; noBtn.TextSize = 13; noBtn.Parent = modalFrame
+Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 8)
+
+local function launchHub(loadHitbox)
+    promptGui:Destroy()
+
+    if loadHitbox then
+        RunService.RenderStepped:Connect(function()
+            pcall(function()
+                if FogConfig.Enabled then
+                    Lighting.FogColor = FogConfig.Color
+                    Lighting.FogStart = FogConfig.StartDistance
+                    Lighting.FogEnd = FogConfig.EndDistance
+                end
+                for _, v in ipairs(Players:GetPlayers()) do
+                    if v ~= localPlayer and v.Character then
+                        local char = v.Character
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hrp and hum and hum.Health > 0 then
+                            if HitboxConfig.Enabled then
+                                if not originalSizes[char] then originalSizes[char] = hrp.Size end
+                                hrp.Size = Vector3.new(HitboxConfig.Size, HitboxConfig.Size, HitboxConfig.Size)
+                                hrp.Transparency = HitboxConfig.Transparency
+                                hrp.Material = Enum.Material.ForceField
+                                hrp.CanCollide = false
+                            else
+                                if originalSizes[char] and hrp.Size ~= originalSizes[char] then
+                                    hrp.Size = originalSizes[char]; hrp.Transparency = 1; hrp.CanCollide = true
+                                end
+                            end
+                            updateChams(char, HitboxConfig.ChamsEnabled)
+                        end
+                    end
+                end
+            end)
+        end)
+    else
+        RunService.RenderStepped:Connect(function()
+            pcall(function()
+                if FogConfig.Enabled then
+                    Lighting.FogColor = FogConfig.Color
+                    Lighting.FogStart = FogConfig.StartDistance
+                    Lighting.FogEnd = FogConfig.EndDistance
+                end
+            end)
+        end)
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MasterUtilityHub"; screenGui.ResetOnSpawn = false
+    screenGui.DisplayOrder = 999; screenGui.Parent = playerGui
+
+    local function makeDraggable(obj)
+        local dragging = false; local dragStart, startPos
+        obj.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = i.Position; startPos = obj.Position
+            end
+        end)
+        obj.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local d = i.Position - dragStart
+                obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+            end
+        end)
+    end
+
+    local function createWindow(title, defaultPos, frameSize, isScriptPanel)
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Size = frameSize; mainFrame.Position = defaultPos
+        mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38); mainFrame.BorderSizePixel = 0
+        mainFrame.Active = true; mainFrame.Parent = screenGui
+        Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+        local ms2 = Instance.new("UIStroke", mainFrame); ms2.Color = Color3.fromRGB(255, 200, 80); ms2.Thickness = 1.5; ms2.Transparency = 0.4
+
+        local expandBtn = Instance.new("TextButton")
+        expandBtn.Size = UDim2.new(0, 200, 0, 36); expandBtn.Position = defaultPos
+        expandBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 25); expandBtn.TextColor3 = Color3.fromRGB(255, 220, 120)
+        expandBtn.Text = "  " .. title; expandBtn.Font = Enum.Font.GothamBold; expandBtn.TextSize = 12
+        expandBtn.TextXAlignment = Enum.TextXAlignment.Left; expandBtn.Visible = false; expandBtn.Active = true; expandBtn.Parent = screenGui
+        Instance.new("UICorner", expandBtn).CornerRadius = UDim.new(0, 10)
+        local greenPlus = Instance.new("TextButton")
+        greenPlus.Size = UDim2.new(0, 26, 0, 26); greenPlus.Position = UDim2.new(1, -31, 0.5, -13)
+        greenPlus.BackgroundColor3 = Color3.fromRGB(46, 204, 113); greenPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+        greenPlus.Text = "+"; greenPlus.Font = Enum.Font.GothamBold; greenPlus.TextSize = 16; greenPlus.Parent = expandBtn
+        Instance.new("UICorner", greenPlus).CornerRadius = UDim.new(0, 6)
+
+        makeDraggable(mainFrame); makeDraggable(expandBtn)
+
+        local headerBar = Instance.new("Frame")
+        headerBar.Size = UDim2.new(1, 0, 0, 32); headerBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        headerBar.BorderSizePixel = 0; headerBar.Parent = mainFrame
+        Instance.new("UICorner", headerBar).CornerRadius = UDim.new(0, 10)
+
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, -40, 1, 0); titleLabel.Position = UDim2.new(0, 12, 0, 0)
+        titleLabel.BackgroundTransparency = 1; titleLabel.Text = title
+        titleLabel.TextColor3 = Color3.fromRGB(255, 220, 120); titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 13; titleLabel.TextXAlignment = Enum.TextXAlignment.Left; titleLabel.Parent = headerBar
+
+        local minimizeBtn = Instance.new("TextButton")
+        minimizeBtn.Size = UDim2.new(0, 24, 0, 22); minimizeBtn.Position = UDim2.new(1, -28, 0, 5)
+        minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60); minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        minimizeBtn.Text = "-"; minimizeBtn.Font = Enum.Font.GothamBold; minimizeBtn.TextSize = 18; minimizeBtn.Parent = headerBar
+        Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 4)
+
+        minimizeBtn.Activated:Connect(function()
+            mainFrame.Visible = false; expandBtn.Position = mainFrame.Position; expandBtn.Visible = true
+        end)
+        greenPlus.Activated:Connect(function()
+            expandBtn.Visible = false; mainFrame.Position = expandBtn.Position; mainFrame.Visible = true
+            if isScriptPanel then notifyOwnerCredit(screenGui) end
+        end)
+
+        local contentContainer = Instance.new("ScrollingFrame")
+        contentContainer.Size = UDim2.new(1, -16, 1, -44); contentContainer.Position = UDim2.new(0, 8, 0, 38)
+        contentContainer.BackgroundTransparency = 1; contentContainer.BorderSizePixel = 0
+        contentContainer.ScrollBarThickness = 3; contentContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+        contentContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y; contentContainer.Parent = mainFrame
+        local layout = Instance.new("UIListLayout"); layout.FillDirection = Enum.FillDirection.Vertical
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.Padding = UDim.new(0, 8); layout.Parent = contentContainer
+        return contentContainer
+    end
+
+    local function addToggle(container, labeltext, callback)
+        local row = Instance.new("TextButton")
+        row.Size = UDim2.new(1, -4, 0, 34); row.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        row.BorderSizePixel = 0; row.Text = ""; row.Parent = container
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -55, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.BackgroundTransparency = 1; lbl.Text = labeltext; lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+        lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
+        local pill = Instance.new("Frame")
+        pill.Size = UDim2.new(0, 38, 0, 18); pill.Position = UDim2.new(1, -46, 0.5, -9)
+        pill.BackgroundColor3 = Color3.fromRGB(70, 70, 80); pill.BorderSizePixel = 0; pill.Parent = row
+        Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+        local knob = Instance.new("Frame")
+        knob.Size = UDim2.new(0, 14, 0, 14); knob.Position = UDim2.new(0, 2, 0.5, -7)
+        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255); knob.BorderSizePixel = 0; knob.Parent = row
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+        local active = false
+        row.MouseButton1Click:Connect(function()
+            active = not active
+            pill.BackgroundColor3 = active and Color3.fromRGB(90, 200, 110) or Color3.fromRGB(70, 70, 80)
+            knob.Position = active and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+            callback(active)
+        end)
+    end
+
+    local function addInput(container, labelText, defaultVal, callback)
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, -4, 0, 34); row.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        row.BorderSizePixel = 0; row.Parent = container
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.6, 0, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.BackgroundTransparency = 1; lbl.Text = labelText; lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+        lbl.Font = Enum.Font.GothamMedium; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
+        local box = Instance.new("TextBox")
+        box.Size = UDim2.new(0, 60, 0, 24); box.Position = UDim2.new(1, -68, 0.5, -12)
+        box.BackgroundColor3 = Color3.fromRGB(35, 35, 42); box.TextColor3 = Color3.fromRGB(255, 255, 255)
+        box.Text = tostring(defaultVal); box.Font = Enum.Font.GothamBold; box.TextSize = 12; box.Parent = row
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 5)
+        box.FocusLost:Connect(function() callback(box.Text) end)
+    end
+
+    local function addButton(container, text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -4, 0, 34); btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        btn.TextColor3 = Color3.fromRGB(230, 230, 230); btn.Text = "  " .. text
+        btn.Font = Enum.Font.GothamMedium; btn.TextSize = 12; btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.Parent = container
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        btn.MouseButton1Click:Connect(callback)
+    end
+
+    if loadHitbox then
+        local hitboxContainer = createWindow("★ MM2 FFA Hitbox", UDim2.new(0.02, 0, 0.25, 0), UDim2.new(0, 210, 0, 240), false)
+        addToggle(hitboxContainer, "Enable Hitbox", function(v) HitboxConfig.Enabled = v end)
+        addInput(hitboxContainer, "Hitbox Size", HitboxConfig.Size, function(val) local n = tonumber(val) if n then HitboxConfig.Size = n end end)
+        addToggle(hitboxContainer, "Red Chams", function(v) HitboxConfig.ChamsEnabled = v end)
+    end
+
+    local fogContainer = createWindow("★ Fog Customizer", UDim2.new(loadHitbox and 0.25 or 0.02, 0, 0.25, 0), UDim2.new(0, 210, 0, 320), false)
+    addToggle(fogContainer, "Enable Fog", function(v) FogConfig.Enabled = v; applyFog() end)
+    addInput(fogContainer, "Thickness (10-300)", FogConfig.EndDistance, function(val) local n = tonumber(val) if n then FogConfig.EndDistance = n; applyFog() end end)
+    addInput(fogContainer, "Hex Color (#)", "#000000", function(val) local c = parseHex(val) if c then FogConfig.Color = c; applyFog() end end)
+
+    local fogHeader = Instance.new("TextLabel")
+    fogHeader.Size = UDim2.new(1, -4, 0, 20); fogHeader.BackgroundTransparency = 1
+    fogHeader.Text = "Color Presets"; fogHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
+    fogHeader.Font = Enum.Font.GothamBold; fogHeader.TextSize = 12
+    fogHeader.TextXAlignment = Enum.TextXAlignment.Left; fogHeader.Parent = fogContainer
+
+    for _, preset in ipairs(FogPresets) do
+        local fogBtn = Instance.new("TextButton")
+        fogBtn.Size = UDim2.new(1, -4, 0, 28); fogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        fogBtn.TextColor3 = Color3.fromRGB(230, 230, 230); fogBtn.Text = "  " .. preset.name
+        fogBtn.Font = Enum.Font.GothamMedium; fogBtn.TextSize = 11
+        fogBtn.TextXAlignment = Enum.TextXAlignment.Left; fogBtn.Parent = fogContainer
+        Instance.new("UICorner", fogBtn).CornerRadius = UDim.new(0, 6)
+        local colorBox = Instance.new("Frame")
+        colorBox.Size = UDim2.new(0, 14, 0, 14); colorBox.Position = UDim2.new(1, -22, 0.5, -7)
+        colorBox.BackgroundColor3 = preset.color; colorBox.BorderSizePixel = 0; colorBox.Parent = fogBtn
+        Instance.new("UICorner", colorBox).CornerRadius = UDim.new(0, 3)
+        fogBtn.MouseButton1Click:Connect(function() FogConfig.Color = preset.color; applyFog() end)
+    end
+
+    local scriptContainer = createWindow("★ Script Panel", UDim2.new(loadHitbox and 0.48 or 0.25, 0, 0.25, 0), UDim2.new(0, 210, 0, 520), true)
+
+    local creditLbl = Instance.new("TextLabel")
+    creditLbl.Size = UDim2.new(1, -4, 0, 24); creditLbl.BackgroundTransparency = 1
+    creditLbl.Text = "Most scripts cracked by ouxhiee (owner)"
+    creditLbl.TextColor3 = Color3.fromRGB(255, 200, 80); creditLbl.Font = Enum.Font.GothamBold
+    creditLbl.TextSize = 10; creditLbl.TextWrapped = true; creditLbl.Parent = scriptContainer
+
+    addButton(scriptContainer, "7yd7 Emotes", function() pcall(function() loadstring(game:HttpGet("https://scriptblox.com/raw/Universal-Script-7yd7-I-Emote-Script-48024"))() end) end)
+    addButton(scriptContainer, "Painel Petrova", function()
+        if screenGui:FindFirstChild("LangPopup") then screenGui.LangPopup:Destroy() end
+        local popupBg = Instance.new("Frame")
+        popupBg.Name = "LangPopup"; popupBg.Size = UDim2.new(1, 0, 1, 0)
+        popupBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0); popupBg.BackgroundTransparency = 0.5
+        popupBg.Active = true; popupBg.Parent = screenGui
+        local modal = Instance.new("Frame")
+        modal.Size = UDim2.new(0, 260, 0, 140); modal.Position = UDim2.new(0.5, -130, 0.5, -70)
+        modal.BackgroundColor3 = Color3.fromRGB(30, 30, 38); modal.BorderSizePixel = 0; modal.Parent = popupBg
+        Instance.new("UICorner", modal).CornerRadius = UDim.new(0, 10)
+        local ms3 = Instance.new("UIStroke", modal); ms3.Color = Color3.fromRGB(255, 200, 80); ms3.Thickness = 1.5; ms3.Transparency = 0.4
+        local promptLbl = Instance.new("TextLabel")
+        promptLbl.Size = UDim2.new(1, 0, 0, 40); promptLbl.BackgroundTransparency = 1
+        promptLbl.Text = "English or Portuguese?"; promptLbl.TextColor3 = Color3.fromRGB(255, 220, 120)
+        promptLbl.Font = Enum.Font.GothamBold; promptLbl.TextSize = 14; promptLbl.Parent = modal
+        local engBtn = Instance.new("TextButton")
+        engBtn.Size = UDim2.new(0.9, 0, 0, 32); engBtn.Position = UDim2.new(0.05, 0, 0, 45)
+        engBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60); engBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        engBtn.Text = "English"; engBtn.Font = Enum.Font.GothamMedium; engBtn.TextSize = 12; engBtn.Parent = modal
+        Instance.new("UICorner", engBtn).CornerRadius = UDim.new(0, 6)
+        engBtn.MouseButton1Click:Connect(function()
+            popupBg:Destroy()
+            pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/painel-petrova-English-version/refs/heads/main/painel%20petrova%20English"))() end)
+        end)
+        local porBtn = Instance.new("TextButton")
+        porBtn.Size = UDim2.new(0.9, 0, 0, 32); porBtn.Position = UDim2.new(0.05, 0, 0, 85)
+        porBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113); porBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        porBtn.Text = "Portuguese"; porBtn.Font = Enum.Font.GothamBold; porBtn.TextSize = 12; porBtn.Parent = modal
+        Instance.new("UICorner", porBtn).CornerRadius = UDim.new(0, 6)
+        porBtn.MouseButton1Click:Connect(function()
+            popupBg:Destroy()
+            pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/antonioffxslegend-collab/Cnp-mmv-Petrova/main/script.lua"))() end)
+        end)
+    end)
+    addButton(scriptContainer, "Bomb Panel", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/cool-bomb-script-ahaha/refs/heads/main/bomb"))() end) end)
+    addButton(scriptContainer, "Devy Blue Menu", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/its-so-devy-in-here-rn/refs/heads/main/so%20preppy%20in%20here%20xxx"))() end) end)
+    addButton(scriptContainer, "Gun Recolour", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/cracked-by-me-hahaha/refs/heads/main/utdftydfx"))() end) end)
+    addButton(scriptContainer, "MMV Admin", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/mmv-haha-cracked-haha-panel-haha/refs/heads/main/cracked"))() end) end)
+    addButton(scriptContainer, "Blow Dryer (broken)", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/blow-dry/refs/heads/main/blow%20dryer%20main"))() end) end)
+    addButton(scriptContainer, "Devy Cursor Hub", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/antonioffxslegend-collab/Devy-shiftlocks-/refs/heads/main/script.lua"))() end) end)
+    addButton(scriptContainer, "Devy Effects", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/antonioffxslegend-collab/Devy-Hub-/refs/heads/main/script.lua"))() end) end)
+    addButton(scriptContainer, "MMV Gears", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/antonioffxslegend-collab/Gears/refs/heads/main/script.lua"))() end) end)
+    addButton(scriptContainer, "Small CNP Panel", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/adammahmou9090-max/aeatzze_cnp-panel/refs/heads/main/aeatzze_cnp.txt"))() end) end)
+    addButton(scriptContainer, "yt4wzxk cnp painel", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/KokiAndCandy/PainelScriptsCnp/refs/heads/main/PainelScriptsCnp"))() end) end)
+    addButton(scriptContainer, "alek speed glitch", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/thalesevarista016-cmyk/Painel-cnpp/refs/heads/main/ALek%20speed%20glitch"))() end) end)
+    addButton(scriptContainer, "old quality", function() pcall(function() loadstring(game:HttpGet("https://pastefy.app/A1P0NDji/raw"))() end) end)
+    addButton(scriptContainer, "Speedglitch w emote", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/sp-sp-sp-speed/refs/heads/main/speed%20hu"))() end) end)
+    addButton(scriptContainer, "pumpkin hub cracked", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/pumpkin-hub-safe-and-cracked/refs/heads/main/hi"))() end) end)
+    addButton(scriptContainer, "molas sonic gears", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/m0las-s0n1c-g3ars/refs/heads/main/love4eva"))() end) end)
+    addButton(scriptContainer, "painel exclusivo", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/painel-exclusivo-cracked/refs/heads/main/exclusive"))() end) end)
+    addButton(scriptContainer, "cc hub MMS ONLY", function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/cookieScriptswithme/MMS-gear-hub-not-visual-/refs/heads/main/Hahahxh"))() end) end)
+
+    notifyOwnerCredit(screenGui)
+end
+
+yesBtn.MouseButton1Click:Connect(function() launchHub(true) end)
+noBtn.MouseButton1Click:Connect(function() launchHub(false) end)
